@@ -1,0 +1,77 @@
+#!/bin/sh
+# -*- sh -*-
+
+: << =cut
+
+=head1 NAME
+
+JIRA MailQueue - Plugin to measure Atlassian JIRA mailqueue status and report its mailqueue errors.
+
+=head1 NOTES
+
+For this Munin plugin to work correctly, you first need CURL to be installed.
+For Debian-based systems the command for install CURL is:
+sudo apt update && sudo apt install curl -y
+
+And second, your JIRA instance needs free add-on to be installed.
+This addon exports current queue status in XML format.
+You can find this add-on and its documentation here:
+https://marketplace.atlassian.com/apps/1214195/mail-queue-monitor-rest-api
+
+And the last, you need to make the symlink for this plugin by next command:
+ln -s /usr/share/munin/plugins/jira_mailqueue /etc/munin/plugins/jira_mailqueue
+
+=head1 CONFIGURATION
+
+As configuration of plugin you must define the URL by which JIRA provides add-on XML report.
+This shows the configuration example:
+
+  [jira_mailqueue]
+     env.xmlurl https://jira.company.com/rest/mailqueue/1.0/status
+
+Please, add this to plugin.conf.d replacing with the right URL for your JIRA instance XML add-on.
+
+=head1 AUTHOR
+
+Copyright (C) 2019  DiMoNlCool
+
+=head1 LICENSE
+
+GPLv2
+
+=head1 MAGIC MARKERS
+
+None. No autoconfiguration is supported.
+
+=cut
+
+. "$MUNIN_LIBDIR/plugins/plugin.sh"
+
+XMLURL="${xmlurl}"
+
+if [ "$1" = "config" ]; then
+
+        echo 'graph_title JIRA MailQueue Status'
+        echo 'graph_args --base 1000 -l 0 '
+        echo 'graph_scale no'
+        echo 'graph_vlabel Number of items/errors in mailqueue'
+        echo 'graph_category jira'
+
+        echo 'mailqueuesize.label Queued mail items'
+        echo 'mailqueuesize.draw AREA'
+        echo 'mailqueuesize.colour 00ff00'
+
+        echo 'mailqueueerrors.label Errors in mail queue'
+        echo 'mailqueueerrors.draw AREA'
+        echo 'mailqueueerrors.colour ff0000'
+        echo 'mailqueueerrors.critical 0:0'
+        print_critical mailqueueerrors
+
+        exit 0
+fi
+
+printf "mailqueuesize.value "
+curl -s  $XMLURL | grep -oP '(?<=size>)[^<]+'
+
+printf "mailqueueerrors.value "
+curl -s  $XMLURL | grep -oP '(?<=errorSize>)[^<]+'
