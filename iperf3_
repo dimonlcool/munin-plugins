@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# iperf3_ munin grabber script
+#
+# 2019.09 modified by DiMoNlCooL
+#
+# 2007.09 original by steve@kosada.com
+#
+# before trying to use this script, make sure:
+#       - you have an iperf3 server running on the remote machine
+#       - you are able to successfully run iperf3 from the commandline.  e.g.,
+#               iperf3 --time 1 --client $host --port $port --format m
+#
+# making symlink to this script use next name formating:
+#         iperf3_hostname_port
+#         or
+#         iperf3_xxx.xxx.xxx.xxx_port
+# where xxx.xxx.xxx.xxx - is IP address of iperf3 server
+#
+# for running iperf3 server on host side permanently
+# it is recommended to create systemd service as follows:
+#
+# [Unit]
+# Description=iPerf Service
+# After=network.target
+#
+# [Service]
+# Type=forking
+# ExecStart=/usr/bin/iperf3 -s -D -p 5201
+# ExecStartPost=/bin/sleep 2
+# ExecStop=/bin/kill -9 `pidof iperf3`
+# Restart=always
+#
+# [Install]
+# WantedBy=multi-user.target
+#
+# next reload systemd daemon, run service it and add to startup:
+#
+# systemctl deamon-reload
+# systemctl start iperf3.service
+# systemctl enable operf3.service
+
+
+destination=`basename $0 | sed 's/^iperf3_//g'`
+host=`echo $destination | cut -d "_" -f1`
+port=`echo $destination | cut -d "_" -f2`
+
+if [ "$1" = "config" ]; then
+        echo "graph_title iperf3 to $host on port $port"
+        echo 'graph_vlabel Mbits/sec'
+        echo 'graph_args --lower-limit 0 --upper-limit 999'
+        echo 'graph_category network'
+        echo 'graph_period second'
+        echo "graph_info This instance of iperf3 measures the transmit speed to $host on $port"
+
+        echo 'iperf3.label iperf3'
+        echo 'iperf3.draw AREA'
+else
+        sleep 1s
+
+        Mbits=`iperf3 --time 1 --client $host --port $port --format m \
+                | grep sender \
+                | tr --squeeze-repeats " " \
+                | cut -d " " -f7`
+
+        echo "iperf3.value $Mbits"
+
+fi
